@@ -37,6 +37,16 @@ const seedDocuments = async (documents) => {
     return insertResult;
 }
 
+const similarity = (v1, v2) => {
+    let sum = 0;
+
+    for (let i = 0; i < v1.length; i++){
+        sum += v1[i] * v2[i];
+    }
+
+    return sum;
+}
+
 const docController = {
     seedDocs: async (req, res) => {
         try {
@@ -52,19 +62,50 @@ const docController = {
     askQuestion: async (req, res) => {
         try {
             // get the query from the request body
+            const { question } = req.body;
 
             // get the embeddings for the query
+            const questionEmbedding = await getEmbedding(question);
 
             // perform a similarity search using dot product to find the most relevant documents
+            // 1. get all the documents from the database
+            const docs = await Doc.find();
 
+            // compute the similarity scores for each document
+            const scores = docs.map(doc => {
+                const score = similarity(questionEmbedding, doc.embedding);
+
+                return {
+                    text: doc.text,
+                    score
+                }
+            });
+
+            // [ { text: "Students may cancel their registration within seven calendar days of p…", score: 0.8 }, { text: "" , score: 0.5 }, {  } ]
             // sort the documents by similarity score and select the top N documents
+            scores.sort((a, b) => b.score - a.score);
+
+            // select the top N documents (for example, top 3)
+            const topDocuments = scores.slice(0, 3);
 
             // construct a prompt for the OpenAI API using the top N documents and the query
+            const context = topDocuments.map((doc, i) => {
+                return `Document ${i + 1}: ${doc.text}`;
+            }).join('\n');
+
+            const prompt = `You are a helpful assistant. Answer using ONLY the context below.
+            Context: ${context}
+            Question: ${question}
+            `;
 
             // send the prompt to the OpenAI API and get the response
+            const response = await openai.responses.create({
+                model: "gpt-5-nano",
+                input: prompt
+            });
 
             // return the response to the client
-            res.status(200).json({ answer: "This is a sample answer to your question." });
+            res.status(200).json({ question, scores,topDocuments, answer: response.output_text });
         } catch (e) {
             res.status(500).json({ error: e.message });
         }
