@@ -1,20 +1,20 @@
 const Doc = require("../models/doc");
-const OpenAI = require('openai');
-const { OPENAI_API_KEY } = require('../utils/config');
+const { GoogleGenAI } = require('@google/genai');
+const { GEMINI_API_KEY } = require('../utils/config');
 
-const openai = new OpenAI({
-    apiKey: OPENAI_API_KEY
+const ai = new GoogleGenAI({
+    apiKey: GEMINI_API_KEY
 });
 
 const getEmbedding = async (text) => {
     // we use the OpenAI API to get the embedding for the given text
-    const response = await openai.embeddings.create({
-        model: "text-embedding-3-small",
-        input: text
+    const response = await ai.models.embedContent({
+        model: "gemini-embedding-2",
+        contents: text
     });
 
     // we return the embedding vector from the response
-    return response.data[0].embedding;
+    return response.embeddings[0].values;
 }
 
 const seedDocuments = async (documents) => {
@@ -99,8 +99,8 @@ const docController = {
             `;
 
             // send the prompt to the OpenAI API and get the response
-            const response = await openai.responses.create({
-                model: "gpt-5-nano",
+            const response = await ai.interactions.create({
+                model: "gemini-3.1-flash-lite",
                 input: prompt
             });
 
